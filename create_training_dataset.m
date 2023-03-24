@@ -1,7 +1,8 @@
 % script to creat a training dataset for mask r cnn training in matlab
 clear;
-root_fn = 'C:\HL\Github\'; % root folder for the project
-image_dataset_fn = 'matlab_maskrcnn\imageset'; % location for the training dataset
+
+root_fn = pwd; % root folder for the project: the folder storing the imageset and test_images folders
+image_dataset_fn = 'imageset'; % location for the training dataset
 
 im_fd = fullfile(root_fn, image_dataset_fn);
 image_fns = dir(fullfile(im_fd, 'syth_image*.tiff'));
@@ -31,7 +32,7 @@ for i_f = 1:length(image_fns)
 end
 %% imageDatastore
 ds = fileDatastore(out_fns, 'ReadFcn',@(x)syth_image_reader2ds(x, imageSize));
-%%
+%% check data looking find
 disp('Data preview')
 data = preview(ds);
 disp(data);

@@ -1,62 +1,22 @@
 % training 
 % if no training data store created, run training data creation script
 clear;
-run C:\HL\Github\matlab_maskrcnn\create_training_dataset.m
-%%
+root_fn = pwd; % root folder for the project: the folder storing the imageset and test_images folders
+run(fullfile(root_fn, 'create_training_dataset.m'));
+%% Use matlab github repo: https://github.com/matlab-deep-learning/mask-rcnn. clone and add to your path
+% training part modified based on https://github.com/matlab-deep-learning/mask-rcnn/blob/main/MaskRCNNParallelTrainingExample.mlx
 classNames = {'cell'};
 numClasses = numel(classNames);
 % Add a background class
 classNames = [classNames {'background'}];
-%{ 
-%%
-AnchorBoxes = [[32 16];
-    [64 32];
-    [128 64];    
-    [32 32];
-    [64 64];
-    [128 128];   
-    [16 32];
-    [32 64];
-    [64 128];
-   ];
-%% 
-% detector_df = maskrcnn("resnet50-coco");
 
-%% load ? 
-detector = maskrcnn("resnet50-coco",classNames,...
-    'InputSize', [128 128 3]);
- 
-%% train using pre-trained network
-
-%% 
-options = trainingOptions("sgdm", ...
-    LearnRateSchedule="piecewise", ...
-    LearnRateDropFactor=0.2, ...
-    LearnRateDropPeriod=5, ...
-    MaxEpochs=1000, ...
-    MiniBatchSize=4, ...
-    BatchNormalizationStatistics ='moving', ...
-    ResetInputNormalization = false); % , ...    Plots="training-progress"
-%%
-
-trainedDetector = trainMaskRCNN(ds, detector, options);
-%}
-
-%% 
-%{%
-%% 
-%%
+%% set parameters
 params = createMaskRCNNConfig(imageSize, numClasses, classNames);
 disp(params);
-%% 
+%% create network
 dlnet = createMaskRCNN(numClasses, params, 'resnet101');
 %%
-if canUseGPU
-    executionEnvironment = "gpu";
-else
-    executionEnvironment = "cpu";
-end
-executionEnvironment = "cpu";
+executionEnvironment = "cpu"; % cpu
 %% SGDM learning parameters
 initialLearnRate = 0.01;
 momemtum = 0.9;
@@ -80,7 +40,7 @@ mb = minibatchqueue(ds, 4, "MiniBatchFormat", ["SSCB", "", "", ""],...
                             "OutputAsDlArray", [true, false, false, false],...
                             "MiniBatchFcn", myMiniBatchFcn,...
                             "OutputEnvironment", [executionEnvironment,"cpu","cpu","cpu"]);
-%%
+%% train
 numEpoch = 1;
 numIteration = 1; 
 
@@ -142,7 +102,7 @@ end
 net = dlnet;
 
 %% save model
-save('C:\HL\Github\matlab_maskrcnn\model.mat', 'net');
+save(fullfile(root_fn, 'cell_finder_model.mat'), 'net');
 %% use model to do detection/inference
 
 %%
@@ -154,19 +114,18 @@ maskSubnet = helper.extractMaskNetwork(net);
 %%
 % Define the target size of the image for inference
 targetSize = [512 512 3]; % imageSize
-test_image_fn = 'C:\HL\Github\matlab_maskrcnn\test_images\syth_image_001.tiff';
+test_image_fn = fullfile(root_fn, 'test_images', 'syth_image_001.tiff');
 img = imread(test_image_fn);
-% Resize the image maintaining the aspect ratio and scaling the largest
-% dimension to the target size.
+% Resize the image 
 imgSize = size(img);
 [~, maxDim] = max(imgSize);
 resizeSize = [NaN NaN]; 
 resizeSize(maxDim) = targetSize(maxDim);
 
 img = imresize(img, resizeSize);
-% img = repmat(img, [1 1 3]);
-cmap = jet(2^16);
-img = ind2rgb(img, cmap);
+img = repmat(img, [1 1 3]);
+% cmap = jet(2^16);
+% img = ind2rgb(img, cmap);
 
 % detect the objects and their masks
 [boxes, scores, labels, masks] = detectMaskRCNN(net, maskSubnet, img, params, executionEnvironment);
@@ -178,6 +137,7 @@ img = ind2rgb(img, cmap);
 % function.
 if(isempty(masks))
     overlayedImage = img;
+    disp('No cell found')
 else
     overlayedImage = insertObjectMask(img, masks);
 end
